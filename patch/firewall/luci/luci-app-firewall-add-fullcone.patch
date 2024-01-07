@@ -1,0 +1,44 @@
+--- a/applications/luci-app-firewall/htdocs/luci-static/resources/view/firewall/zones.js
++++ b/applications/luci-app-firewall/htdocs/luci-static/resources/view/firewall/zones.js
+@@ -57,6 +57,11 @@ return view.extend({
+ 		};
+ 
+ 		o = s.option(form.Flag, 'drop_invalid', _('Drop invalid packets'));
++		if (L.hasSystemFeature('fullcone')) {
++			o = s.option(form.Flag, 'fullcone', _('Enable FullCone NAT'));
++			if (fw4)
++				o = s.option(form.Flag, 'fullcone6', _('Enable FullCone NAT6'));
++		}
+ 
+ 		var p = [
+ 			s.option(form.ListValue, 'input', _('Input')),
+--- a/applications/luci-app-firewall/po/templates/firewall.pot
++++ b/applications/luci-app-firewall/po/templates/firewall.pot
+@@ -288,6 +288,12 @@ msgstr ""
+ msgid "Enable SYN-flood protection"
+ msgstr ""
+ 
++msgid "Enable FullCone NAT"
++msgstr ""
++
++msgid "Enable FullCone NAT6"
++msgstr ""
++
+ #: applications/luci-app-firewall/htdocs/luci-static/resources/view/firewall/zones.js:290
+ msgid "Enable logging on this zone"
+ msgstr ""
+--- a/applications/luci-app-firewall/po/zh_Hans/firewall.po
++++ b/applications/luci-app-firewall/po/zh_Hans/firewall.po
+@@ -330,6 +330,12 @@ msgstr "启用 NAT 环回"
+ msgid "Enable SYN-flood protection"
+ msgstr "启用 SYN-flood 防御"
+ 
++msgid "Enable FullCone NAT"
++msgstr "启用 FullCone NAT"
++
++msgid "Enable FullCone NAT6"
++msgstr "启用 FullCone NAT6"
++
+ #: applications/luci-app-firewall/htdocs/luci-static/resources/view/firewall/zones.js:290
+ msgid "Enable logging on this zone"
+ msgstr "启用此区域的日志记录"

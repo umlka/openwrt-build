@@ -1,0 +1,11 @@
+--- a/package/boot/grub2/Makefile
++++ b/package/boot/grub2/Makefile
+@@ -25,7 +25,7 @@ ifneq ($(BUILD_VARIANT),none)
+ endif
+ 
+ PKG_FLAGS:=nonshared
+-PKG_BUILD_FLAGS:=no-lto
++PKG_BUILD_FLAGS:=no-gc-sections no-lto
+ 
+ include $(INCLUDE_DIR)/host-build.mk
+ include $(INCLUDE_DIR)/package.mk

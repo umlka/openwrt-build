@@ -1,0 +1,20 @@
+--- a/package/libs/openssl/Makefile
++++ b/package/libs/openssl/Makefile
+@@ -10,7 +10,7 @@ include $(TOPDIR)/rules.mk
+ PKG_NAME:=openssl
+ PKG_VERSION:=3.0.12
+ PKG_RELEASE:=1
+-PKG_BUILD_FLAGS:=no-mips16 gc-sections no-lto
++PKG_BUILD_FLAGS:=no-mips16 gc-sections
+ 
+ PKG_BUILD_PARALLEL:=1
+ 
+@@ -374,7 +374,7 @@ define Build/Configure
+ 	)
+ endef
+ 
+-TARGET_CFLAGS += $(FPIC)
++TARGET_CFLAGS += $(FPIC) -ffat-lto-objects
+ 
+ define Build/Compile
+ 	+$(MAKE) $(PKG_JOBS) -C $(PKG_BUILD_DIR) \

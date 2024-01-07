@@ -1,0 +1,41 @@
+From 1ca3574df2926f3e7d997639d62b3049edef5fb7 Mon Sep 17 00:00:00 2001
+From: Alin Nastac <alin.nastac@gmail.com>
+Date: Wed, 3 Jan 2024 15:59:55 +0100
+Subject: [PATCH] odhcp6c: sync and accumulate RA & DHCPv6 events as fast as
+ possible
+
+This fixes dc186d6d2b0dd4ad23ca5fc69c00e81f796ff6d9 commit which
+introduce accumulation delay differences between the 2 possible scenarios:
+ 1) When DHCPv6 bound event precede RA receival, sync script is called
+   after 1 second since accumulation has been completed (i.e. RA has
+   been received).
+ 2) When RA receival precedes DHCPv6 bound event, sync script is called
+    after a delay of 10 seconds since accumulation is done.
+
+Signed-off-by: Alin Nastac <alin.nastac@gmail.com>
+---
+ src/odhcp6c.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/odhcp6c.c b/src/odhcp6c.c
+index 4a6d7bd..adebcb0 100644
+--- a/src/odhcp6c.c
++++ b/src/odhcp6c.c
+@@ -500,7 +500,7 @@ int main(_unused int argc, char* const argv[])
+ 
+ 			while (!signal_usr2 && !signal_term) {
+ 				signal_usr1 = false;
+-				script_call("informed", script_sync_delay, true);
++				script_call("informed", ra ? script_accu_delay : script_sync_delay, true);
+ 
+ 				res = dhcpv6_poll_reconfigure();
+ 				odhcp6c_signal_process();
+@@ -528,7 +528,7 @@ int main(_unused int argc, char* const argv[])
+ 
+ 		case DHCPV6_STATEFUL:
+ 			bound = true;
+-			script_call("bound", script_sync_delay, true);
++			script_call("bound", ra ? script_accu_delay : script_sync_delay, true);
+ 			syslog(LOG_NOTICE, "entering stateful-mode on %s", ifname);
+ 
+ 			while (!signal_usr2 && !signal_term) {

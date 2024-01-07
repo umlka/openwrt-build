@@ -1,0 +1,41 @@
+From 8167242f25518ddf232fcbca4693e29cea18207c Mon Sep 17 00:00:00 2001
+From: Det <detonate@helix.net.nz>
+Date: Sat, 9 Dec 2023 13:56:56 +0000
+Subject: [PATCH] Check nat46 kernel module exists before requesting Softwire46
+ options
+
+Closes: openwrt#14056
+
+Signed-off-by: Richard Patterson <richard@helix.net.nz>
+---
+ src/dhcpv6.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/src/dhcpv6.c b/src/dhcpv6.c
+index ca5957e..49e6c93 100644
+--- a/src/dhcpv6.c
++++ b/src/dhcpv6.c
+@@ -261,12 +261,20 @@ int init_dhcpv6(const char *ifname, unsigned int options, int sk_prio, int sol_t
+ #ifdef EXT_CER_ID
+ 			htons(DHCPV6_OPT_CER_ID),
+ #endif
+-			htons(DHCPV6_OPT_S46_CONT_MAPE),
+-			htons(DHCPV6_OPT_S46_CONT_MAPT),
+-			htons(DHCPV6_OPT_S46_CONT_LW),
+ 		};
+ 		odhcp6c_add_state(STATE_ORO, oro, sizeof(oro));
++
++		// Add Softwire46 (RFC7598) options if the req'd kernel module exists
++		if (access("/sys/module/nat46", F_OK) == 0) {
++			uint16_t sw46_oro[] = {
++				htons(DHCPV6_OPT_S46_CONT_MAPE),
++				htons(DHCPV6_OPT_S46_CONT_MAPT),
++				htons(DHCPV6_OPT_S46_CONT_LW),
++			};
++			odhcp6c_add_state(STATE_ORO, sw46_oro, sizeof(sw46_oro));
++		}
+ 	}
++
+ 	// Required oro
+ 	uint16_t req_oro[] = {
+ 		htons(DHCPV6_OPT_INF_MAX_RT),
