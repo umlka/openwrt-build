@@ -1,0 +1,51 @@
+#!/bin/sh
+
+uci -q batch <<-EOF >/dev/null
+	#语言设置
+	set luci.main.lang='auto'
+	commit luci
+
+	#自动挂载
+	set fstab.@global[0].anon_mount='1'
+	commit fstab
+
+	#时区设置
+	set system.@system[0].timezone='CST-8'
+	set system.@system[0].zonename='Asia/Shanghai'
+	del system.ntp.server
+	add_list system.ntp.server='ntp.aliyun.com'
+	add_list system.ntp.server='ntp.tencent.com'
+	add_list system.ntp.server='cn.pool.ntp.org'
+	add_list system.ntp.server='time.ustc.edu.cn'
+	commit system
+
+	#packet steering
+	set network.globals.packet_steering='1'
+	commit network
+
+	#dropbear
+	set dropbear.@dropbear[0].Interface='lan'
+	commit dropbear
+EOF
+
+#dnsmasq
+sed -i '/log-facility/d' /etc/dnsmasq.conf
+echo 'log-facility=/dev/null' >> /etc/dnsmasq.conf
+
+#镜像源
+sed -i 's,downloads.openwrt.org,mirrors.pku.edu.cn/openwrt,g' /etc/opkg/distfeeds.conf
+
+#软链接
+[ ! -f /usr/bin/ip ] && [ -f /sbin/ip ] && ln -sf /sbin/ip /usr/bin/ip
+[ ! -f /usr/bin/wget-ssl ] && [ -f /usr/bin/wget ] && ln -sf /usr/bin/wget /usr/bin/wget-ssl
+
+#Flag packages
+opkg flag hold dnsmasq
+opkg flag hold firewall
+opkg flag hold luci-app-firewall
+
+#Flush LuCI cache
+rm -f /tmp/luci-indexcache
+rm -rf /tmp/luci-modulecache
+
+exit 0

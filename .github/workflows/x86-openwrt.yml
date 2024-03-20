@@ -1,0 +1,173 @@
+name: X86 OpenWrt
+
+on:
+  schedule:
+    - cron: 30 0 * * 1
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: 'Compile verbose (make -j1 V=s)'
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  openwrt_build:
+    name: openwrt build
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Set time zone
+      run: |
+        sudo -E timedatectl set-timezone 'Asia/Shanghai'
+
+    - name: Show system
+      run: |
+        lscpu
+        free -h
+        df -h
+        uname -a
+
+    - name: Free disk space
+      uses: easimon/maximize-build-space@master
+      with:
+        root-reserve-mb: 4096
+        temp-reserve-mb: 128
+        swap-size-mb: 512
+        remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
+        remove-docker-images: 'true'
+
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Build system setup
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        sudo -E apt update
+        xargs -a dependencies sudo -E apt -y install
+        sudo -E systemctl daemon-reload
+        sudo -E apt -y autoremove --purge
+        sudo -E apt clean
+        sudo -E git config --global user.name 'GitHub Actions' && git config --global user.email 'noreply@github.com'
+        sudo -E git config --global core.abbrev auto
+        sudo -E git config --global advice.detachedHead false
+        df -h
+
+    - name: Prepare mixedwrt
+      run: |
+        echo "DATE=$(date +'%Y-%m-%d-%H-%M')" >> $GITHUB_ENV
+        cp -rf scripts/x86/* scripts/
+        cp -rf scripts/* ./
+        bash 00-get_ready.sh
+
+    - name: Update feeds
+      run: |
+        cd openwrt
+        ./scripts/feeds update -a && ./scripts/feeds install -a
+
+    - name: Prepare package
+      run: |
+        cd openwrt
+        cp -rf ../scripts/* ./
+        bash 01-prepare_package.sh
+        bash 01-target_only.sh
+        [ "${{ vars.UPDATE_DAE }}" = "true" ] && [ -f package/new/dae/update_to_commit.sh ] && bash package/new/dae/update_to_commit.sh && cat package/new/dae/Makefile || true
+
+    - name: Make defconfig
+      run: |
+        cd openwrt
+        cp -f ../config/x86/config.seed .config
+        make defconfig
+
+    - name: Generate variables
+      run: |
+        cd openwrt
+        BOARD="$(sed -n 's/^CONFIG_TARGET_BOARD=\"\(.*\)\"/\1/p' .config)"
+        echo "BOARD=${BOARD}" >> $GITHUB_ENV
+        SUBTARGET="$(sed -n 's/^CONFIG_TARGET_SUBTARGET=\"\(.*\)\"/\1/p' .config)"
+        echo "SUBTARGET=${SUBTARGET}" >> $GITHUB_ENV
+        PACKAGES="$(sed -n 's/^CONFIG_TARGET_ARCH_PACKAGES=\"\(.*\)\"/\1/p' .config)"
+        echo "PACKAGES=${PACKAGES}" >> $GITHUB_ENV
+        TAG="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//i')"
+        [ -z "${TAG}" ] && TAG="$(cd ${{ github.workspace }} && git branch --show-current)"
+        echo "TAG=${TAG}" >> $GITHUB_ENV
+
+    - name: Upload config
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.TAG }}-${{ env.BOARD }}-${{ env.SUBTARGET }}-config-${{ env.DATE }}
+        path: |
+          openwrt/.config
+
+    - name: Make download
+      run: |
+        cd openwrt
+        make download -j48
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: Compile firmware
+      if: ${{ !inputs.verbose }}
+      id: compile
+      continue-on-error: true
+      run: |
+        cd openwrt
+        IGNORE_ERRORS=1 make -j$(($(nproc) + 1))
+        echo $?
+
+    - name: Upload kconfig
+      if: ${{ !inputs.verbose }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.TAG }}-${{ env.BOARD }}-${{ env.SUBTARGET }}-kconfig-${{ env.DATE }}
+        path: |
+          openwrt/build_dir/target-${{ env.BOARD }}_${{ env.SUBTARGET }}_*/linux-${{ env.BOARD }}_${{ env.SUBTARGET }}/linux-*/.config
+
+    - name: Compile verbose
+      if: ${{ inputs.verbose || steps.compile.outcome == 'failure' }}
+      run: |
+        cd openwrt
+        make -j1 V=s
+
+    - name: Check space usage
+      run: |
+        df -h
+
+    - name: Organize files
+      run: |
+        mkdir -p artifact
+        mv -f openwrt/bin/targets/${{ env.BOARD }}/${{ env.SUBTARGET }}/* artifact/ ; \
+        pushd artifact >/dev/null
+        find . -maxdepth 1 -type f -name '*.gz' -exec gzip -dq {} \;
+        find . -maxdepth 1 -type f -name '*.img' -exec gzip --best {} \;
+        find . -maxdepth 1 -type f ! -name 'sha256sums' -printf '%f\0' | xargs -0 -i -r sha256sum {} > sha256sums
+        ls -Ahl
+        popd >/dev/null
+
+    - name: Upload package
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.TAG }}-${{ env.PACKAGES }}-package-${{ env.DATE }}
+        path: |
+          openwrt/bin/packages/${{ env.PACKAGES }}/
+
+    - name: Upload firmware
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.TAG }}-${{ env.BOARD }}-${{ env.SUBTARGET }}-firmware-${{ env.DATE }}
+        path: |
+          artifact/*squashfs-combined-efi.img*
+
+    - name: Upload buildinfo
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ env.TAG }}-${{ env.BOARD }}-${{ env.SUBTARGET }}-buildinfo-${{ env.DATE }}
+        path: |
+          artifact/sha256sums
+          artifact/*.config
+          artifact/*.manifest
+          artifact/*.buildinfo
+          artifact/profiles.json
