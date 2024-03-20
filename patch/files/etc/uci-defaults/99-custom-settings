@@ -1,0 +1,32 @@
+#!/bin/sh
+
+#IPv6
+uci set dhcp.@dnsmasq[0].rebind_protection='0'
+uci -q del dhcp.@dnsmasq[0].filteraaaa
+uci -q del dhcp.lan.ndp
+uci -q del dhcp.lan.dhcpv6
+uci set dhcp.lan.ra='server'
+uci set dhcp.lan.ra_slaac='1'
+uci -q del dhcp.lan.ra_flags
+uci add_list dhcp.lan.ra_flags='none'
+uci set dhcp.lan.ra_dns='0'
+uci set dhcp.lan.dns_service='0'
+uci set dhcp.lan.max_preferred_lifetime='2700'
+uci set dhcp.lan.max_valid_lifetime='5400'
+uci commit dhcp
+uci -q del network.globals.ula_prefix
+uci set network.lan.ip6assign='60'
+uci set network.lan.ip6ifaceid='eui64'
+uci commit network
+
+#firewall
+uci set firewall.@defaults[0].fullcone='1'
+uci set firewall.@defaults[0].fullcone6='1'
+uci set firewall.@defaults[0].flow_offloading='1'
+uci commit firewall
+
+#nlbwmon
+uci set nlbwmon.@nlbwmon[0].netlink_buffer_size='16777216'
+uci commit nlbwmon
+
+exit 0
