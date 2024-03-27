@@ -1,0 +1,26 @@
+From f6a11947624d93445b86c367dc6fa2cc29fa8fe9 Mon Sep 17 00:00:00 2001
+From: Tianling Shen <cnsztl@gmail.com>
+Date: Fri, 15 Mar 2024 18:30:24 +0800
+Subject: [PATCH] kernel: add missing Kconfig symbol
+
+Signed-off-by: Tianling Shen <cnsztl@gmail.com>
+---
+ config/Config-kernel.in | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/config/Config-kernel.in b/config/Config-kernel.in
+index 8b8a48201e3..b3be6362dee 100644
+--- a/config/Config-kernel.in
++++ b/config/Config-kernel.in
+@@ -547,6 +547,11 @@ config KERNEL_BPF_EVENTS
+ 	  for sending data from BPF programs to user-space for post-processing
+ 	  or logging.
+ 
++config KERNEL_PROBE_EVENTS_BTF_ARGS
++	bool
++	depends on KERNEL_KPROBE_EVENTS && KERNEL_DEBUG_INFO_BTF
++	default n
++
+ config KERNEL_BPF_KPROBE_OVERRIDE
+ 	bool
+ 	depends on KERNEL_KPROBES
